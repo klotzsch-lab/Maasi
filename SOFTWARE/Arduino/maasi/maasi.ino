@@ -10,9 +10,9 @@
 
 
 #define DEFAULT_DISPENSE_SPEED 600       // RPM
-#define DEFAULT_COAT_SPEED 3000          // RPM
+#define DEFAULT_COAT_SPEED 3000          
 #define MIN_COAT_SPEED 300
-#define MAX_COAT_SPEED 10000
+#define MAX_COAT_SPEED 8000
 #define INCREMETS_COAT_SPEED 100
 
 
@@ -22,9 +22,13 @@
 #define MAX_COAT_TIME 80000
 #define INCREMETS_COAT_TIME 1000
 #define DEFAULT_RAMPUP_TIME 3000
-#define DEFAULT_RAMPDOWN_TIME 1000
+#define MIN_RAMPUP_TIME 1000
+#define MAX_RAMPUP_TIME 6000
+#define DEFAULT_RAMPDOWN_TIME 1500
+#define MIN_RAMPDOWN_TIME 500
+#define MAX_RAMPDOWN_TIME 5000
 
-#define MOTOR_POLES 14
+#define MOTOR_POLE_PAIRS 7
 
 #define GREY 54970
 #define GREEN 17864
@@ -34,7 +38,7 @@
 //  Coating params
 //---------------------------------------
 
-uint16_t disp_speed, coat_speed, rampup_speed_increments, rampdown_speed_decrements;
+uint16_t disp_speed, coat_speed;
 
 int32_t rampup_time, rampdown_time, coat_time;
 
@@ -49,7 +53,7 @@ enum state {
 state current_state, previous_state = STATE_IDLE;
 
 //----------------------------------------------------------------------------
-// Espressif Infrared library is used to create DSHOT messages in a fast manner
+// Espressif Infrared Remote(rmt) library is used to create DSHOT messages in a fast manner
 //-----------------------------------------------------------------------------
 
 TaskHandle_t Task1;
@@ -64,9 +68,9 @@ HardwareSerial TelSerial(1);
 // ESC Telemetry variables
 uint8_t receivedBytes = 0;
 volatile bool requestTelemetry = false;
-bool printTelemetry = false;
-
 int16_t ESC_telemetry[5]; // Temperature, Voltage, Current, used mAh, eRpM
+//uint32_t telemetry_fails = 0;
+//uint32_t telemetry_succ = 0;
 
 
 uint32_t currentTime;
@@ -83,14 +87,14 @@ uint32_t rpmMAX = 0;
 uint32_t kv = 0;
 uint32_t kvMax = 0;
 
-
 //---------------------------------------
 //   PID parameters
 //---------------------------------------
 double motor_setRPM, motor_actualRPM, pid_output = 0;
 double pid_out_min = 48;
 double pid_out_max = 2047;
-double Kp = 0.015, Ki = 0.8, Kd = 0.0000; // Before 1,3,0
+double Kp = 0.015, Ki = 0.8 , Kd = 0.0; // Before 1,3,0
+const int sample_time = 1; //ms
 
 
 PID motorPID(&motor_actualRPM, &pid_output, &motor_setRPM, Kp, Ki, Kd, DIRECT);
@@ -100,7 +104,6 @@ PID motorPID(&motor_actualRPM, &pid_output, &motor_setRPM, Kp, Ki, Kd, DIRECT);
 //   ESC Control Parameters
 //---------------------------------------
 
-bool esc_enabled = 0;
 uint16_t dshotUserInputValue = 0;
 uint16_t dshotmin = 48;
 uint16_t dshotmax = 2047;
@@ -112,17 +115,16 @@ void IRAM_ATTR getTelemetry() {
 void startTelemetryTimer() {
   timer = timerBegin(0, 80, true); // timer_id = 0; divider=80; countUp = true;
   timerAttachInterrupt(timer, &getTelemetry, true); // edge = true
-  timerAlarmWrite(timer, 20000, true);  //1000 = 1 ms
+  timerAlarmWrite(timer, 1000, true);  //1000 = 1 ms
   timerAlarmEnable(timer);
 }
 
-// Second core used to handle dshot packets
+// Second core used to send DSHOT packets
 void secondCoreTask( void * pvParameters ) {
   while (1) {
 
-    dshotOutput(dshotUserInputValue, requestTelemetry);
-
     if (requestTelemetry) {
+      dshotOutput(dshotUserInputValue, requestTelemetry);
       requestTelemetry = false;
       receivedBytes = 0;
     }
@@ -200,12 +202,13 @@ void b6PushCallback(void *ptr)
     p1.show();
     p1n0.setValue(disp_speed);
     p1n1.setValue(rampup_time/1000);     
+    p1n2.setValue(rampdown_time);  
 }
 
 void p1b0PushCallback(void *ptr)
 {
    if (disp_speed > MIN_COAT_SPEED){
-    disp_speed -= INCREMETS_COAT_SPEED;
+    disp_speed -= INCREMETS_COAT_SPEED/2;
     }
    p1n0.setValue(disp_speed);
 
@@ -214,14 +217,14 @@ void p1b0PushCallback(void *ptr)
 void p1b1PushCallback(void *ptr)
 {
     if (disp_speed < MAX_COAT_SPEED){
-    disp_speed += INCREMETS_COAT_SPEED;
+    disp_speed += INCREMETS_COAT_SPEED/2;
     }
     p1n0.setValue(disp_speed);
 }
 
 void p1b2PushCallback(void *ptr)
 {
-  if (rampup_time > MIN_COAT_TIME){
+  if (rampup_time > MIN_RAMPUP_TIME){
     rampup_time -= INCREMETS_COAT_TIME;
     }
     p1n1.setValue(rampup_time/1000);
@@ -229,23 +232,47 @@ void p1b2PushCallback(void *ptr)
 
 void p1b3PushCallback(void *ptr)
 {
-    if (rampup_time < MAX_COAT_TIME){
+    if (rampup_time < MAX_RAMPUP_TIME){
     rampup_time += INCREMETS_COAT_TIME;
     }
     p1n1.setValue(rampup_time/1000); 
 }
 
+void p1b4PushCallback(void *ptr)
+{
+  if (rampdown_time > MIN_RAMPDOWN_TIME){
+    rampdown_time -= INCREMETS_COAT_TIME/2;
+    }
+    p1n2.setValue(rampdown_time);
+}
 
+void p1b5PushCallback(void *ptr)
+{
+  if (rampdown_time < MAX_RAMPDOWN_TIME){
+    rampdown_time += INCREMETS_COAT_TIME/2;
+    }
+    p1n2.setValue(rampdown_time);
+}
+
+void p1b6PushCallback(void *ptr)
+{
+
+}
+
+void p1b7PushCallback(void *ptr)
+{
+
+}
 //---------------------------------------
 //   Timers
 //---------------------------------------
 elapsedMillis time_since_display_update = 0;
-elapsedMillis time_since_sample = 0;
 
 elapsedMillis time_ramping = 0;
 elapsedMillis time_coating = 0;
 
-const int sample_time = 5;
+//elapsedMicros time_since_telemetry = 0;
+
 const int display_update_time = 100;
 
 
@@ -315,7 +342,11 @@ void setup() {
   p1b0.attachPush(p1b0PushCallback);
   p1b1.attachPush(p1b1PushCallback);
   p1b2.attachPush(p1b2PushCallback);
-  p1b3.attachPush(p1b3PushCallback);  
+  p1b3.attachPush(p1b3PushCallback);
+  p1b4.attachPush(p1b4PushCallback);
+  p1b5.attachPush(p1b5PushCallback);
+  p1b6.attachPush(p1b6PushCallback);
+  p1b7.attachPush(p1b7PushCallback); 
   p2b0.attachPush(p2b0PushCallback);
   p2b1.attachPush(p2b1PushCallback);
 
@@ -333,6 +364,7 @@ void loop() {
   nexLoop(nex_listen_list); //Check callback list
   updateDisplay();
   if (!requestTelemetry) {
+    motorPID.Compute();
     receiveTelemtry();
   }
   updateMotor();
@@ -354,7 +386,6 @@ void startDispense(){
   }
   
 void startRampup(){
-  
   p2b1.Set_background_color_bco(GREY); //Set button Grey
   t4.setText("Ramping up");
   current_state = STATE_RAMPUP;
@@ -362,6 +393,7 @@ void startRampup(){
   motorPID.SetMode(AUTOMATIC);
   time_ramping = 0;
   }
+  
 void startRampdown(){
   t4.setText("Ramping down");
   current_state = STATE_RAMPDOWN;
@@ -369,13 +401,13 @@ void startRampdown(){
   motorPID.SetMode(AUTOMATIC);
   time_ramping = 0; 
   }
+  
 void startCoating(){
   //p2.show();
   //p2b1.Set_background_color_bco(GREY); //Set button Grey
   t4.setText("Coating");
   current_state = STATE_COATING;
-  
-
+ 
   motor_setRPM = coat_speed; 
   motorPID.SetMode(AUTOMATIC); 
   time_coating = 0;
@@ -386,6 +418,7 @@ void initDisplay(){
     n1.setValue(coat_speed);
     p1n0.setValue(disp_speed);
     p1n1.setValue(rampup_time/1000);
+    p1n2.setValue(rampdown_time);
   }
 
 void updateDisplay() {
@@ -408,14 +441,15 @@ void updateDisplay() {
         //p2j0.setValue(100-(rampup_time - time_ramping)*100/rampup_time);
         break;      
       case STATE_RAMPDOWN:      
-        //p2n0.setValue((rampdown_time - time_ramping)/1000);
+        p2n0.setValue((rampdown_time - time_ramping)/1000);
         p2n1.setValue(motor_actualRPM);
         p2j0.setValue(0);
         break;     
       case STATE_COATING:      
         p2n0.setValue((coat_time - time_coating)/1000);
         p2n1.setValue(motor_actualRPM);
-        p2j0.setValue((coat_time - time_coating)*100/coat_time);   
+        p2j0.setValue((coat_time - time_coating)*100/coat_time); // % Progress bar
+        //p2n0.setValue(abs(coat_speed - motor_actualRPM)); //Debuging RPM error 
         break;
     } 
   }
@@ -424,10 +458,9 @@ void updateDisplay() {
 
 void updateMotor() {
 
-  if (time_since_sample >= sample_time) {
-    time_since_sample = 0;
     motor_actualRPM = rpm;
 
+    
     switch (current_state){
       case STATE_IDLE:
        motorPID.SetMode(MANUAL); 
@@ -451,7 +484,7 @@ void updateMotor() {
         
       case STATE_COATING:
         if (time_coating < coat_time){
-          dshotUserInputValue = pid_output;     
+          dshotUserInputValue = pid_output;    
           }
         else{
           startRampdown();
@@ -459,8 +492,9 @@ void updateMotor() {
         break;
 
       case STATE_RAMPDOWN:
+        int rampdown_speed = motor_actualRPM;
         if (time_ramping < rampdown_time){
-          motor_setRPM = map(time_ramping, 0, rampdown_time, motor_setRPM, 0 );
+          motor_setRPM = map(time_ramping, 0, rampdown_time, rampdown_speed, 0 );
           dshotUserInputValue = pid_output;     
           }
         else{
@@ -469,8 +503,7 @@ void updateMotor() {
         break;
 
     }
-    motorPID.Compute();
-  }
+
 }
 
 
@@ -497,7 +530,7 @@ void receiveTelemtry() {
         TelSerial.read();
 
       requestTelemetry = true;
-
+      //telemetry_fails++;
       return; // transmission failure
     }
 
@@ -508,9 +541,11 @@ void receiveTelemtry() {
     ESC_telemetry[3] = (SerialBuf[5] << 8) | SerialBuf[6]; // used mA/h
     ESC_telemetry[4] = (SerialBuf[7] << 8) | SerialBuf[8]; // eRpM *100
 
+    //telemetry_succ++;
     requestTelemetry = true;
-
     // Update values and smooth
+
+    /*
     temperature = 0.9 * temperature + 0.1 * ESC_telemetry[0];
     if (temperature > temperatureMax) {
       temperatureMax = temperature;
@@ -525,24 +560,16 @@ void receiveTelemtry() {
     if (current > currentMax) {
       currentMax = current;
     }
-
-    erpm = 0.9 * erpm + 0.1 * (ESC_telemetry[4] * 100);
+    */
+    //erpm = 0.7 * erpm + 0.3 * (ESC_telemetry[4] * 100);
+    erpm = ESC_telemetry[4] * 100;
     if (erpm > erpmMax) {
       erpmMax = erpm;
     }
 
-    rpm = erpm / (MOTOR_POLES / 2);
+    rpm = erpm / (MOTOR_POLE_PAIRS);
     if (rpm > rpmMAX) {
       rpmMAX = rpm;
-    }
-
-    if (rpm) {                  // Stops weird numbers :|
-      kv = rpm / voltage / ( (float(dshotUserInputValue) - dshotmin) / (dshotmax - dshotmin) );
-    } else {
-      kv = 0;
-    }
-    if (kv > kvMax) {
-      kvMax = kv;
     }
 
   }
