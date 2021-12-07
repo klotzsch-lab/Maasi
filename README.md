@@ -151,7 +151,7 @@ The required version for this project is the v32.7
 An arduino UNO or nano is needed as flashing device between the PC and the ESC.
 
 ###  Putting together the Hardware
-![using_maasi](https://github.com/klotzsch-lab/Maasi/blob/main/Images/circuit.png?raw=true)
+![circuit_diagram_maasi](https://github.com/klotzsch-lab/Maasi/blob/main/Images/circuit.png?raw=true)
 
 
 ## Safety Considerations
