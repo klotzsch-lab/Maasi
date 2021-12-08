@@ -66,7 +66,7 @@ Here we present Maasi, an affordable Spin Coater that is easy to build and has a
 
   
 
-* Arduino firmware to coordinate the process.
+* Arduino firmware source files.
 
   
 
@@ -186,7 +186,7 @@ Maasi was developed by the [Klotzsch Lab](https://www.biologie.hu-berlin.de/en/g
 
 -  [Dani Carbonell](https://github.com/dani-carbonell)
 
-- [Willi Weber]
+-  Willi Weber
 
 -  [Enrico Klotzsch](https://www.biologie.hu-berlin.de/en/groupsites/jpexpbp/members/Enrico_Klotzsch)
 
@@ -198,13 +198,12 @@ Maasi was developed by the [Klotzsch Lab](https://www.biologie.hu-berlin.de/en/g
   
 
 The maasi project is based on a number of other open source projects and papers.
+A complete references list can be found inside the HardwareX paper.
 
   
-
 The idea to use the ESC telemetry was based on the DIY spin coater built by [@BenKrasnow](https://www.youtube.com/watch?v=321tptQ8PrU) (Applied Science in Youtube)
 
   
-
 The documentation format was largely inspired by [Pachter Lab](https://pachterlab.github.io/):
 
 [Booeshaghi, A.S., Beltrame, E.d.V., Bannon, D. et al. Principles of open source bioinstrumentation applied to the poseidon syringe pump system. Sci Rep 9, 12385 (2019). https://doi.org/10.1038/s41598-019-48815-9](https://www.nature.com/articles/s41598-019-48815-9)
