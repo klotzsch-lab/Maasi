@@ -9,7 +9,8 @@
 
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/dwyl/esta/issues)
 
-  
+[![DOI](https://zenodo.org/badge/385644588.svg)](https://zenodo.org/badge/latestdoi/385644588)
+
 
   
 
