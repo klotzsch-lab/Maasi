@@ -115,6 +115,8 @@ The ESP32 is the main MCU in Maasi. It coordinates the actions in the coating pr
 
 Use the Arduino IDE to compile and flash the ESP32 (DevKitc V4)
 
+ <strong>IMPORTANT: </strong> Users are experiencing problems (unresponsive touchscreen) with the Arduino ESP32 [v1.0.5](https://github.com/espressif/arduino-esp32/releases) and above. Please use the Board Manager to install v1.0.4 or previous until a fix is released.
+
 **Make sure to install the following libraries**
 
   
