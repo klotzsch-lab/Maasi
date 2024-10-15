@@ -16,6 +16,9 @@
 
 ## maasi: Open source spin coater
 
+## WARNING!!!!! This project is no longer actively maintained. 
+
+## Proceeding to build or use this project is at your own risk and responsibility.
   
 
 A fully 3D printed, easy-to-use and open-source spin coater.
